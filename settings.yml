@@ -1,0 +1,2 @@
+anat_resolutions: ["0pt5", "0pt8", "1pt0"]
+func_formats: ["1pt8mm", "1pt0mm", "fsaverage"]
