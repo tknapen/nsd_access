@@ -5,6 +5,15 @@ import nibabel as nb
 import numpy as np
 import pandas as pd
 
+import h5py
+
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
+import urllib.request
+import zipfile
+from pycocotools.coco import COCO
+
 
 class NSDAccess(object):
     """
@@ -129,8 +138,8 @@ class NSDAccess(object):
 
         Returns
         -------
-        [type]
-            [description]
+        numpy.ndarray, 3D
+            RGB image data
         """
         sf = h5py.File(self.stimuli_file, 'r')
         sdataset = sf.get('imgBrick')
@@ -144,7 +153,7 @@ class NSDAccess(object):
                 s.imshow(d)
         return sdataset[image_index]
 
-    def image_coco_info(self, image_index, info_type='captions', show_annot=False, show_img=False):
+    def read_image_coco_info(self, image_index, info_type='captions', show_annot=False, show_img=False):
         """image_coco_info returns the coco annotations of a given single image
 
         Parameters
@@ -160,8 +169,8 @@ class NSDAccess(object):
 
         Returns
         -------
-        [type]
-            [description]
+        coco Annotation
+            coco annotation, to be used in subsequent analysis steps
         """
         if not hasattr(self, 'stim_descriptions'):
             self.stim_descriptions = pd.read_csv(
