@@ -23,6 +23,7 @@ class NSDAccess(object):
     def __init__(self, nsd_folder, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.nsd_folder = nsd_folder
+        self.nsddata_folder = op.join(self.nsd_folder, 'nsddata')
         self.ppdata_folder = op.join(self.nsd_folder, 'nsddata', 'ppdata')
         self.nsddata_betas_folder = op.join(
             self.nsd_folder, 'nsddata_betas', 'ppdata')
@@ -83,7 +84,7 @@ class NSDAccess(object):
                 session_betas.append(hdata)
             out_data = np.squeeze(np.vstack(session_betas))
         else:
-            out_data = nb.load(op.join(data_folder, f'betas_session{si_str}.nii.gz').get_data()
+            out_data = nb.load(op.join(data_folder, f'betas_session{si_str}.nii.gz')).get_data()
 
         if len(trial_index) == 0:
             trial_index = slice(0, out_data.shape[-1])
@@ -131,7 +132,7 @@ class NSDAccess(object):
             which atlas to read,
             for volume formats, any of ['HCP_MMP1', 'Kastner2015', 'nsdgeneral', 'visualsulc'] for volume,
             for fsaverage
-            can be prefixed by '.lh' or '.rh' for hemisphere-specific atlases in volume
+            can be prefixed by 'lh.' or 'rh.' for hemisphere-specific atlases in volume
             for surface: takes both hemispheres by default, instead when prefixed by '.rh' or '.lh'.
             By default 'HCP_MMP1'.
         data_format : str, optional
@@ -141,23 +142,35 @@ class NSDAccess(object):
         -------
         numpy.ndarray, 1D/2D (surface) or 3D/4D (volume data formats)
             the requested atlas values
+        dict,
+            dictionary containing the mapping between ROI names and atlas values
         """
+
+        # first, get the mapping.
+        atlas_name = atlas
+        if atlas[:3] in ('rh.', 'lh.'):
+            atlas_name = atlas[3:]
+
+        mapp_df = pd.read_csv(os.path.join(self.nsddata_folder, 'freesurfer', 'fsaverage', 'label', f'{atlas_name}.mgz.ctab'), delimiter=' ', header=None, index_col=0)
+        atlas_mapping = mapp_df.to_dict()[1]
+        atlas_mapping = {y:x for x,y in atlas_mapping.items()} # dict((y,x) for x,y in atlas_mapping.iteritems())
+
         if data_format not in ('func1pt8mm', 'func1mm', 'MNI'):
             # if surface based results by exclusion
             if atlas[:3] in ('rh.', 'lh.'): # check if hemisphere-specific atlas requested
-                ipf = op.join(self.ppdata_folder, 'freesurfer', subject, 'label', f'{atlas}.mgz')
-                return nb.load(ipf).get_data()
+                ipf = op.join(self.nsddata_folder, 'freesurfer', subject, 'label', f'{atlas}.mgz')
+                return np.squeeze(nb.load(ipf).get_data()), atlas_mapping
             else: # more than one hemisphere requested
                 session_betas = []
                 for hemi in ['lh', 'rh']:
                     hdata = nb.load(op.join(
-                        self.ppdata_folder, 'freesurfer', subject, 'label', f'{hemi}.{atlas}.mgz')).get_data()
+                        self.nsddata_folder, 'freesurfer', subject, 'label', f'{hemi}.{atlas}.mgz')).get_data()
                     session_betas.append(hdata)
                 out_data = np.squeeze(np.vstack(session_betas))
-                return out_data
+                return out_data, atlas_mapping
         else: # is 'func1pt8mm', 'MNI', or 'func1mm'
             ipf = op.join(self.ppdata_folder, subject, data_format, 'roi', f'{atlas}.nii.gz')
-            return nb.load(ipf).get_data()
+            return nb.load(ipf).get_data(), atlas_mapping
 
     def list_atlases(self, subject, data_format='fsaverage', abs_paths=False):
         """list_atlases [summary]
@@ -177,15 +190,20 @@ class NSDAccess(object):
         list
             collection of absolute path names to
         """
-        if data_format not in ('func1pt8mm', 'func1mm', 'MNI'):
-            atlas_files = glob.glob(op.join(self.ppdata_folder, 'freesurfer', subject, 'label', '*.mgz'))
+        if data_format in ('func1pt8mm', 'func1mm', 'MNI'):
+            atlas_files = glob.glob(op.join(self.ppdata_folder, subject, data_format, 'roi', '*.nii.gz'))
         else:
-            atlas_files = op.join(self.ppdata_folder, subject, data_format, 'roi', '*.nii.gz')
-        print('Atlases: found {} in {}'.format([op.split(f)[1] for f in atlas_files], op.split(atlas_files[0])[0]))
+            atlas_files = glob.glob(op.join(self.nsddata_folder, 'freesurfer', subject, 'label', '*.mgz'))
+
+        # print this
+        import pprint
+        pp = pprint.PrettyPrinter(indent=4)
+        print('Atlases found in {}:'.format(op.split(atlas_files[0])[0]))
+        pp.pprint([op.split(f)[1] for f in atlas_files])
         if abs_paths:
-            return [op.split(f)[1] for f in atlas_files]
-        else:
             return atlas_files
+        else: # this is the format which you can input into other functions, so this is the default
+            return np.unique([op.split(f)[1].replace('lh.','').replace('rh.','').replace('.mgz','').replace('.nii.gz','') for f in atlas_files])
 
     def read_behavior(self, subject, session_index, trial_index=[]):
         """read_behavior [summary]
@@ -233,6 +251,11 @@ class NSDAccess(object):
         numpy.ndarray, 3D
             RGB image data
         """
+
+        if not hasattr(self, 'stim_descriptions'):
+            self.stim_descriptions = pd.read_csv(
+                self.stimuli_description_file, index_col=0)
+
         sf = h5py.File(self.stimuli_file, 'r')
         sdataset = sf.get('imgBrick')
         if show:
