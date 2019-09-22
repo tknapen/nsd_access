@@ -72,28 +72,120 @@ class NSDAccess(object):
         numpy.ndarray, 2D (fsaverage) or 4D (other data formats)
             the requested per-trial beta values
         """
-        if data_format == 'fsaverage':
-            read_format = 'surf'
-        else:
-            read_format = 'volume'
-
         data_folder = op.join(self.nsddata_betas_folder,
                               subject, data_format, data_type)
+        si_str = str(session_index).zfill(2)
         if data_format == 'fsaverage':
             session_betas = []
             for hemi in ['lh', 'rh']:
                 hdata = nb.load(op.join(
-                    data_folder, hemi + '.betas_session{}.mgz'.format(str(session_index).zfill(2)))).get_data()
+                    data_folder, f'{hemi}.betas_session{si_str}.mgz')).get_data()
                 session_betas.append(hdata)
             out_data = np.squeeze(np.vstack(session_betas))
         else:
-            out_data = nb.load(op.join(data_folder, 'betas_session{}.nii.gz'.format(
-                str(session_index).zfill(2)))).get_data()
+            out_data = nb.load(op.join(data_folder, f'betas_session{si_str}.nii.gz').get_data()
 
         if len(trial_index) == 0:
             trial_index = slice(0, out_data.shape[-1])
 
         return out_data[..., trial_index]
+
+    def read_mapper_results(self, subject, mapper='prf', data_type='angle', data_format='fsaverage'):
+        """read_mapper_results [summary]
+
+        Parameters
+        ----------
+        subject : str
+            subject identifier, such as 'subj01'
+        mapper : str, optional
+            first part of the mapper filename, by default 'prf'
+        data_type : str, optional
+            second part of the mapper filename, by default 'angle'
+        data_format : str, optional
+            what type of data format, from ['fsaverage', 'func1pt8mm', 'func1mm'], by default 'fsaverage'
+
+        Returns
+        -------
+        numpy.ndarray, 2D (fsaverage) or 4D (other data formats)
+            the requested mapper values
+        """
+        if data_format == 'fsaverage':
+            # unclear for now where the fsaverage mapper results would be
+            # as they are still in fsnative format now.
+            raise NotImplementedError('no mapper results in fsaverage present for now')
+        else: # is 'func1pt8mm' or 'func1mm'
+            ipf = op.join(self.ppdata_folder, subject, data_format, f'{mapper}_{data_type}.nii.gz')
+            return nb.load(ipf).get_data()
+
+    def read_atlas_results(self, subject, atlas='HCP_MMP1', data_format='fsaverage'):
+        """read_atlas_results [summary]
+
+        Parameters
+        ----------
+        subject : str
+            subject identifier, such as 'subj01'
+            for surface-based data formats, subject should be the same as data_format.
+            for example, for fsaverage, both subject and data_format should be 'fsaverage'
+            this requires a little more typing but makes data format explicit
+        atlas : str, optional
+            which atlas to read,
+            for volume formats, any of ['HCP_MMP1', 'Kastner2015', 'nsdgeneral', 'visualsulc'] for volume,
+            for fsaverage
+            can be prefixed by '.lh' or '.rh' for hemisphere-specific atlases in volume
+            for surface: takes both hemispheres by default, instead when prefixed by '.rh' or '.lh'.
+            By default 'HCP_MMP1'.
+        data_format : str, optional
+            what type of data format, from ['fsaverage', 'func1pt8mm', 'func1mm', 'MNI'], by default 'fsaverage'
+
+        Returns
+        -------
+        numpy.ndarray, 1D/2D (surface) or 3D/4D (volume data formats)
+            the requested atlas values
+        """
+        if data_format not in ('func1pt8mm', 'func1mm', 'MNI'):
+            # if surface based results by exclusion
+            if atlas[:3] in ('rh.', 'lh.'): # check if hemisphere-specific atlas requested
+                ipf = op.join(self.ppdata_folder, 'freesurfer', subject, 'label', f'{atlas}.mgz')
+                return nb.load(ipf).get_data()
+            else: # more than one hemisphere requested
+                session_betas = []
+                for hemi in ['lh', 'rh']:
+                    hdata = nb.load(op.join(
+                        self.ppdata_folder, 'freesurfer', subject, 'label', f'{hemi}.{atlas}.mgz')).get_data()
+                    session_betas.append(hdata)
+                out_data = np.squeeze(np.vstack(session_betas))
+                return out_data
+        else: # is 'func1pt8mm', 'MNI', or 'func1mm'
+            ipf = op.join(self.ppdata_folder, subject, data_format, 'roi', f'{atlas}.nii.gz')
+            return nb.load(ipf).get_data()
+
+    def list_atlases(self, subject, data_format='fsaverage', abs_paths=False):
+        """list_atlases [summary]
+
+        Parameters
+        ----------
+        subject : str
+            subject identifier, such as 'subj01'
+            for surface-based data formats, subject should be the same as data_format.
+            for example, for fsaverage, both subject and data_format should be 'fsaverage'
+            this requires a little more typing but makes data format explicit
+        data_format : str, optional
+            what type of data format, from ['fsaverage', 'func1pt8mm', 'func1mm', 'MNI'], by default 'fsaverage'
+
+        Returns
+        -------
+        list
+            collection of absolute path names to
+        """
+        if data_format not in ('func1pt8mm', 'func1mm', 'MNI'):
+            atlas_files = glob.glob(op.join(self.ppdata_folder, 'freesurfer', subject, 'label', '*.mgz'))
+        else:
+            atlas_files = op.join(self.ppdata_folder, subject, data_format, 'roi', '*.nii.gz')
+        print('Atlases: found {} in {}'.format([op.split(f)[1] for f in atlas_files], op.split(atlas_files[0])[0]))
+        if abs_paths:
+            return [op.split(f)[1] for f in atlas_files]
+        else:
+            return atlas_files
 
     def read_behavior(self, subject, session_index, trial_index=[]):
         """read_behavior [summary]
