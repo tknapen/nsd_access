@@ -1,5 +1,14 @@
 # nsd_access
-python package to access the data of the NSD (natural scenes dataset) fMRI project
+
+This package provides a single class (`NSDAccess`) allowing the user to quickly and easily access the data from the Natural Scenes Dataset.
+
+It provides, in arbitrary volume or surface-based formats:
+- one-line access to regions of interest and mapper experiment results
+- one-line access to arbitrary trial betas (of any provided type)
+- one-line access to all behavioral output for arbitrary trials
+- one-line access to all images in the dataset, and
+- one-line access to the COCO annotations of all images in the dataset.
+
 
 For more information on this dataset and the project generating it, see [the NSD project website](http://naturalscenesdataset.org)
 
