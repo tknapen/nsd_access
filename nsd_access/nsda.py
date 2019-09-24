@@ -14,6 +14,7 @@ import urllib.request
 import zipfile
 from pycocotools.coco import COCO
 
+from IPython import embed
 
 class NSDAccess(object):
     """
@@ -52,7 +53,51 @@ class NSDAccess(object):
         zip_file_object.extractall(path=op.split(
             op.split(self.coco_annotation_file)[0])[0])
 
-    def read_betas(self, subject, session_index, trial_index=[], data_type='betas_fithrf_GLMdenoise_RR', data_format='fsaverage'):
+    def affine_header(self, subject, data_format='func1pt8mm'):
+        """affine_header affine and header, for construction of Nifti image
+
+        Parameters
+        ----------
+        subject : str
+            subject identifier, such as 'subj01'
+        data_format : str, optional
+            what type of data format, from ['func1pt8mm', 'func1mm'], by default 'func1pt8mm'
+
+        Returns
+        -------
+        tuple
+            affine and header, for construction of Nifti image
+        """
+        full_path = op.join(self.ppdata_folder, '{subject}', '{data_format}', 'brainmask.nii.gz')
+        full_path = full_path.format(subject=subject,
+                                     data_format=data_format)
+        nii = nb.load(full_path)
+
+        return nii.affine, nii.header
+
+
+    def read_vol_ppdata(self, subject, filename='brainmask', data_format='func1pt8mm'):
+        """load_brainmask, returns boolean brainmask for volumetric data formats
+
+        Parameters
+        ----------
+        subject : str
+            subject identifier, such as 'subj01'
+        data_format : str, optional
+            what type of data format, from ['func1pt8mm', 'func1mm'], by default 'func1pt8mm'
+
+        Returns
+        -------
+        numpy.ndarray, 4D (bool)
+            brain mask array
+        """
+        full_path = op.join(self.ppdata_folder, '{subject}', '{data_format}', '{filename}.nii.gz')
+        full_path = full_path.format(subject=subject,
+                                     data_format=data_format,
+                                     filename=filename)
+        return nb.load(full_path).get_data()
+
+    def read_betas(self, subject, session_index, trial_index=[], data_type='betas_fithrf_GLMdenoise_RR', data_format='fsaverage', mask=None):
         """read_betas read betas from MRI files
 
         Parameters
@@ -67,6 +112,8 @@ class NSDAccess(object):
             which type of beta values to return from ['betas_assumehrf', 'betas_fithrf', 'betas_fithrf_GLMdenoise_RR', 'restingbetas_fithrf'], by default 'betas_fithrf_GLMdenoise_RR'
         data_format : str, optional
             what type of data format, from ['fsaverage', 'func1pt8mm', 'func1mm'], by default 'fsaverage'
+        mask : numpy.ndarray, if defined, selects 'mat' data_format, needs volumetric data_format
+            binary/boolean mask into mat file beta data format.
 
         Returns
         -------
@@ -76,6 +123,21 @@ class NSDAccess(object):
         data_folder = op.join(self.nsddata_betas_folder,
                               subject, data_format, data_type)
         si_str = str(session_index).zfill(2)
+
+        if type(mask) == np.ndarray: # will use the mat file iff exists, otherwise boom!
+            ipf = op.join(data_folder, f'betas_session{si_str}.mat')
+            assert op.isfile(ipf), \
+                'Error: ' + ipf + ' not available for masking. You may need to download these separately.'
+            # will do indexing of both space and time in one go for this option,
+            # so will return results immediately from this
+            h5 = h5py.File(ipf, 'r')
+            betas = h5.get('betas')
+            # embed()
+            if len(trial_index) == 0:
+                trial_index = slice(0, betas.shape[0])
+            # this isn't finished yet - binary masks cannot be used for indexing like this
+            return betas[trial_index, np.nonzero(mask)]
+
         if data_format == 'fsaverage':
             session_betas = []
             for hemi in ['lh', 'rh']:
@@ -84,6 +146,7 @@ class NSDAccess(object):
                 session_betas.append(hdata)
             out_data = np.squeeze(np.vstack(session_betas))
         else:
+            # if no mask was specified, we'll use the nifti image
             out_data = nb.load(op.join(data_folder, f'betas_session{si_str}.nii.gz')).get_data()
 
         if len(trial_index) == 0:
@@ -115,8 +178,7 @@ class NSDAccess(object):
             # as they are still in fsnative format now.
             raise NotImplementedError('no mapper results in fsaverage present for now')
         else: # is 'func1pt8mm' or 'func1mm'
-            ipf = op.join(self.ppdata_folder, subject, data_format, f'{mapper}_{data_type}.nii.gz')
-            return nb.load(ipf).get_data()
+            return self.read_vol_ppdata(subject=subject, filename=f'{mapper}_{data_type}', data_format=data_format)
 
     def read_atlas_results(self, subject, atlas='HCP_MMP1', data_format='fsaverage'):
         """read_atlas_results [summary]
