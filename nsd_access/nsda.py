@@ -398,33 +398,33 @@ class NSDAccess(object):
                 # because the images were cropped. See image information per image to do this.
                 coco.showAnns(coco_annot)
 
-            elif len(image_index) > 1:
+        elif len(image_index) > 1:
 
-                # we output a list of annots
-                coco_annot = []
+            # we output a list of annots
+            coco_annot = []
 
-                # load train_2017
-                annot_file = self.coco_annotation_file.format(
-                    info_type, 'train2017')
-                coco_train = COCO(annot_file)
+            # load train_2017
+            annot_file = self.coco_annotation_file.format(
+                info_type, 'train2017')
+            coco_train = COCO(annot_file)
 
-                # also load the val 2017
-                annot_file = self.coco_annotation_file.format(
-                    info_type, 'val2017')
-                coco_val = COCO(annot_file)
+            # also load the val 2017
+            annot_file = self.coco_annotation_file.format(
+                info_type, 'val2017')
+            coco_val = COCO(annot_file)
 
-                for image in image_index:
-                    subj_info = self.stim_descriptions.iloc[image]
-                    if subj_info['cocoSplit'] == 'train2017':
-                        coco_annot_IDs = coco_train.getAnnIds(
-                            [subj_info['cocoId']])
-                        coco_ann = coco_train.loadAnns(coco_annot_IDs)
-                        coco_annot.append(coco_ann)
+            for image in image_index:
+                subj_info = self.stim_descriptions.iloc[image]
+                if subj_info['cocoSplit'] == 'train2017':
+                    coco_annot_IDs = coco_train.getAnnIds(
+                        [subj_info['cocoId']])
+                    coco_ann = coco_train.loadAnns(coco_annot_IDs)
+                    coco_annot.append(coco_ann)
 
-                    elif subj_info['cocoSplit'] == 'val2017':
-                        coco_annot_IDs = coco_val.getAnnIds(
-                            [subj_info['cocoId']])
-                        coco_ann = coco_val.loadAnns(coco_annot_IDs)
-                        coco_annot.append(coco_ann)
+                elif subj_info['cocoSplit'] == 'val2017':
+                    coco_annot_IDs = coco_val.getAnnIds(
+                        [subj_info['cocoId']])
+                    coco_ann = coco_val.loadAnns(coco_annot_IDs)
+                    coco_annot.append(coco_ann)
 
         return coco_annot
