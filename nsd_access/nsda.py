@@ -16,7 +16,6 @@ from pycocotools.coco import COCO
 
 from IPython import embed
 
-
 class NSDAccess(object):
     """
     Little class that provides easy access to the NSD data, see [http://naturalscenesdataset.org](their website)
@@ -69,13 +68,13 @@ class NSDAccess(object):
         tuple
             affine and header, for construction of Nifti image
         """
-        full_path = op.join(self.ppdata_folder,
-                            '{subject}', '{data_format}', 'brainmask.nii.gz')
+        full_path = op.join(self.ppdata_folder, '{subject}', '{data_format}', 'brainmask.nii.gz')
         full_path = full_path.format(subject=subject,
                                      data_format=data_format)
         nii = nb.load(full_path)
 
         return nii.affine, nii.header
+
 
     def read_vol_ppdata(self, subject, filename='brainmask', data_format='func1pt8mm'):
         """load_brainmask, returns boolean brainmask for volumetric data formats
@@ -92,8 +91,7 @@ class NSDAccess(object):
         numpy.ndarray, 4D (bool)
             brain mask array
         """
-        full_path = op.join(self.ppdata_folder,
-                            '{subject}', '{data_format}', '{filename}.nii.gz')
+        full_path = op.join(self.ppdata_folder, '{subject}', '{data_format}', '{filename}.nii.gz')
         full_path = full_path.format(subject=subject,
                                      data_format=data_format,
                                      filename=filename)
@@ -126,7 +124,7 @@ class NSDAccess(object):
                               subject, data_format, data_type)
         si_str = str(session_index).zfill(2)
 
-        if type(mask) == np.ndarray:  # will use the mat file iff exists, otherwise boom!
+        if type(mask) == np.ndarray: # will use the mat file iff exists, otherwise boom!
             ipf = op.join(data_folder, f'betas_session{si_str}.mat')
             assert op.isfile(ipf), \
                 'Error: ' + ipf + ' not available for masking. You may need to download these separately.'
@@ -149,8 +147,7 @@ class NSDAccess(object):
             out_data = np.squeeze(np.vstack(session_betas))
         else:
             # if no mask was specified, we'll use the nifti image
-            out_data = nb.load(
-                op.join(data_folder, f'betas_session{si_str}.nii.gz')).get_data()
+            out_data = nb.load(op.join(data_folder, f'betas_session{si_str}.nii.gz')).get_data()
 
         if len(trial_index) == 0:
             trial_index = slice(0, out_data.shape[-1])
@@ -179,9 +176,8 @@ class NSDAccess(object):
         if data_format == 'fsaverage':
             # unclear for now where the fsaverage mapper results would be
             # as they are still in fsnative format now.
-            raise NotImplementedError(
-                'no mapper results in fsaverage present for now')
-        else:  # is 'func1pt8mm' or 'func1mm'
+            raise NotImplementedError('no mapper results in fsaverage present for now')
+        else: # is 'func1pt8mm' or 'func1mm'
             return self.read_vol_ppdata(subject=subject, filename=f'{mapper}_{data_type}', data_format=data_format)
 
     def read_atlas_results(self, subject, atlas='HCP_MMP1', data_format='fsaverage'):
@@ -217,19 +213,16 @@ class NSDAccess(object):
         if atlas[:3] in ('rh.', 'lh.'):
             atlas_name = atlas[3:]
 
-        mapp_df = pd.read_csv(os.path.join(self.nsddata_folder, 'freesurfer', 'fsaverage',
-                                           'label', f'{atlas_name}.mgz.ctab'), delimiter=' ', header=None, index_col=0)
+        mapp_df = pd.read_csv(os.path.join(self.nsddata_folder, 'freesurfer', 'fsaverage', 'label', f'{atlas_name}.mgz.ctab'), delimiter=' ', header=None, index_col=0)
         atlas_mapping = mapp_df.to_dict()[1]
-        # dict((y,x) for x,y in atlas_mapping.iteritems())
-        atlas_mapping = {y: x for x, y in atlas_mapping.items()}
+        atlas_mapping = {y:x for x,y in atlas_mapping.items()} # dict((y,x) for x,y in atlas_mapping.iteritems())
 
         if data_format not in ('func1pt8mm', 'func1mm', 'MNI'):
             # if surface based results by exclusion
-            if atlas[:3] in ('rh.', 'lh.'):  # check if hemisphere-specific atlas requested
-                ipf = op.join(self.nsddata_folder, 'freesurfer',
-                              subject, 'label', f'{atlas}.mgz')
+            if atlas[:3] in ('rh.', 'lh.'): # check if hemisphere-specific atlas requested
+                ipf = op.join(self.nsddata_folder, 'freesurfer', subject, 'label', f'{atlas}.mgz')
                 return np.squeeze(nb.load(ipf).get_data()), atlas_mapping
-            else:  # more than one hemisphere requested
+            else: # more than one hemisphere requested
                 session_betas = []
                 for hemi in ['lh', 'rh']:
                     hdata = nb.load(op.join(
@@ -237,9 +230,8 @@ class NSDAccess(object):
                     session_betas.append(hdata)
                 out_data = np.squeeze(np.vstack(session_betas))
                 return out_data, atlas_mapping
-        else:  # is 'func1pt8mm', 'MNI', or 'func1mm'
-            ipf = op.join(self.ppdata_folder, subject,
-                          data_format, 'roi', f'{atlas}.nii.gz')
+        else: # is 'func1pt8mm', 'MNI', or 'func1mm'
+            ipf = op.join(self.ppdata_folder, subject, data_format, 'roi', f'{atlas}.nii.gz')
             return nb.load(ipf).get_data(), atlas_mapping
 
     def list_atlases(self, subject, data_format='fsaverage', abs_paths=False):
@@ -261,11 +253,9 @@ class NSDAccess(object):
             collection of absolute path names to
         """
         if data_format in ('func1pt8mm', 'func1mm', 'MNI'):
-            atlas_files = glob.glob(
-                op.join(self.ppdata_folder, subject, data_format, 'roi', '*.nii.gz'))
+            atlas_files = glob.glob(op.join(self.ppdata_folder, subject, data_format, 'roi', '*.nii.gz'))
         else:
-            atlas_files = glob.glob(
-                op.join(self.nsddata_folder, 'freesurfer', subject, 'label', '*.mgz'))
+            atlas_files = glob.glob(op.join(self.nsddata_folder, 'freesurfer', subject, 'label', '*.mgz'))
 
         # print this
         import pprint
@@ -274,8 +264,8 @@ class NSDAccess(object):
         pp.pprint([op.split(f)[1] for f in atlas_files])
         if abs_paths:
             return atlas_files
-        else:  # this is the format which you can input into other functions, so this is the default
-            return np.unique([op.split(f)[1].replace('lh.', '').replace('rh.', '').replace('.mgz', '').replace('.nii.gz', '') for f in atlas_files])
+        else: # this is the format which you can input into other functions, so this is the default
+            return np.unique([op.split(f)[1].replace('lh.','').replace('rh.','').replace('.mgz','').replace('.nii.gz','') for f in atlas_files])
 
     def read_behavior(self, subject, session_index, trial_index=[]):
         """read_behavior [summary]
@@ -340,11 +330,7 @@ class NSDAccess(object):
                 s.imshow(d)
         return sdataset[image_index]
 
-    def read_image_coco_info(self,
-                             image_index,
-                             info_type='captions',
-                             show_annot=False,
-                             show_img=False):
+    def read_image_coco_info(self, image_index, info_type='captions', show_annot=False, show_img=False):
         """image_coco_info returns the coco annotations of a single image or a list of images
 
         Parameters
@@ -362,42 +348,37 @@ class NSDAccess(object):
         -------
         coco Annotation
             coco annotation, to be used in subsequent analysis steps
-
-        example:
-            ci = nsda.read_image_coco_info([579], info_type='captions', show_annot=False)
-            ci = nsda.read_image_coco_info([579, 2569], info_type='captions', show_annot=False)
-
         """
         if not hasattr(self, 'stim_descriptions'):
             self.stim_descriptions = pd.read_csv(
                 self.stimuli_description_file, index_col=0)
-
         if len(image_index) == 1:
-            subj_info = self.stim_descriptions.iloc[image_index[0]]
-            # checking whether annotation file for this trial exists.
-            # This may not be the right place to call the download, and
-            # re-opening the annotations for all images separately may be slowing things down
-            # however images used in the experiment seem to have come from different sets.
-            annot_file = self.coco_annotation_file.format(
-                info_type, subj_info['cocoSplit'])
-            print('getting annotations from ' + annot_file)
-            if not os.path.isfile(annot_file):
-                print('annotations file not found')
-                self.download_coco_annotation_file()
+		        subj_info = self.stim_descriptions.iloc[image_index]
 
-            coco = COCO(annot_file)
-            coco_annot_IDs = coco.getAnnIds([subj_info['cocoId']])
-            coco_annot = coco.loadAnns(coco_annot_IDs)
+		        # checking whether annotation file for this trial exists.
+		        # This may not be the right place to call the download, and
+		        # re-opening the annotations for all images separately may be slowing things down
+		        # however images used in the experiment seem to have come from different sets.
+		        annot_file = self.coco_annotation_file.format(
+		            info_type, subj_info['cocoSplit'])
+		        print('getting annotations from ' + annot_file)
+		        if not os.path.isfile(annot_file):
+		            print('annotations file not found')
+		            self.download_coco_annotation_file()
 
-            if show_img:
-                self.read_images([image_index], show=True)
+		        coco = COCO(annot_file)
+		        coco_annot_IDs = coco.getAnnIds([subj_info['cocoId']])
+		        coco_annot = coco.loadAnns(coco_annot_IDs)
 
-            if show_annot:
-                # still need to convert the annotations (especially person_keypoints and instances) to the right reference frame,
-                # because the images were cropped. See image information per image to do this.
-                coco.showAnns(coco_annot)
+	        if show_img:
+	            self.read_images([image_index], show=True)
 
-        elif len(image_index) > 1:
+	        if show_annot:
+	            # still need to convert the annotations (especially person_keypoints and instances) to the right reference frame,
+	            # because the images were cropped. See image information per image to do this.
+	            coco.showAnns(coco_annot)
+
+	    elif len(image_index) > 1:
 
             # we output a list of annots
             coco_annot = []
