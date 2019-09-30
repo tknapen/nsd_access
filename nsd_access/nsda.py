@@ -348,6 +348,14 @@ class NSDAccess(object):
         -------
         coco Annotation
             coco annotation, to be used in subsequent analysis steps
+		
+		Example
+		-------
+		single image:
+			ci = read_image_coco_info([569], info_type='captions', show_annot=False, show_img=False)
+		list of images:
+			ci = read_image_coco_info([569, 2569], info_type='captions')
+
         """
         if not hasattr(self, 'stim_descriptions'):
             self.stim_descriptions = pd.read_csv(
