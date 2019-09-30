@@ -105,7 +105,7 @@ class NSDAccess(object):
         subject : str
             subject identifier, such as 'subj01'
         session_index : int
-            which session, counting from 0
+            which session, counting from 1
         trial_index : list, optional
             which trials from this session's file to return, by default [], which returns all trials
         data_type : str, optional
