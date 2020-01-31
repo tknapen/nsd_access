@@ -4,9 +4,9 @@ import glob
 import nibabel as nb
 import numpy as np
 import pandas as pd
+from pandas.io.json import json_normalize
 
 import h5py
-
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
@@ -107,7 +107,7 @@ class NSDAccess(object):
         subject : str
             subject identifier, such as 'subj01'
         session_index : int
-            which session, counting from 0
+            which session, counting from 1
         trial_index : list, optional
             which trials from this session's file to return, by default [], which returns all trials
         data_type : str, optional
@@ -373,7 +373,7 @@ class NSDAccess(object):
             self.stim_descriptions = pd.read_csv(
                 self.stimuli_description_file, index_col=0)
         if len(image_index) == 1:
-            subj_info = self.stim_descriptions.iloc[image_index]
+            subj_info = self.stim_descriptions.iloc[image_index[0]]
 
             # checking whether annotation file for this trial exists.
             # This may not be the right place to call the download, and
@@ -428,3 +428,94 @@ class NSDAccess(object):
                     coco_annot.append(coco_ann)
 
         return coco_annot
+
+    def read_image_coco_category(self, image_index):
+        """image_coco_category returns the coco category of a single image or a list of images
+        
+        Args:
+            image_index ([list of integers]):  which images indexed in the 73k format to return
+                                               the category for
+
+        Returns
+        -------
+        coco category
+        coco category, to be used in subsequent analysis steps
+
+            Example
+            -------
+            single image:
+                    ci = read_image_coco_category(
+                        [569])
+            list of images:
+                    ci = read_image_coco_category(
+                        [569, 2569])
+        """
+
+        if not hasattr(self, 'stim_descriptions'):
+            self.stim_descriptions = pd.read_csv(
+                self.stimuli_description_file, index_col=0)
+
+        if len(image_index) == 1:
+            subj_info = self.stim_descriptions.iloc[image_index[0]]
+            coco_id = subj_info['cocoId']
+
+            # checking whether annotation file for this trial exists.
+            # This may not be the right place to call the download, and
+            # re-opening the annotations for all images separately may be slowing things down
+            # however images used in the experiment seem to have come from different sets.
+            annot_file = self.coco_annotation_file.format(
+                'instances', subj_info['cocoSplit'])
+            print('getting annotations from ' + annot_file)
+            if not os.path.isfile(annot_file):
+                print('annotations file not found')
+                self.download_coco_annotation_file()
+
+            coco = COCO(annot_file)
+            categories = json_normalize(coco.loadCats(coco.getCatIds()))
+            
+            image_by_cats = [coco.getImgIds(catIds=[x]) for x in range(1,91)]
+
+            image_categories = [j for j, x in enumerate(image_by_cats) if coco_id in x]
+
+            coco_cats = [categories.iloc[c-1]['name'] for c in image_categories] 
+
+        elif len(image_index) > 1:
+
+            # we output a list of annots
+            coco_cats = []
+
+            # load train_2017
+            annot_file = self.coco_annotation_file.format(
+                'instances', 'train2017')
+            coco_train = COCO(annot_file)
+
+            image_by_cats_train = [coco_train.getImgIds(catIds=[x]) for x in range(1,91)]
+
+            # also load the val 2017
+            annot_file = self.coco_annotation_file.format(
+                'instances', 'val2017')
+            coco_val = COCO(annot_file)
+
+            image_by_cats_val = [coco_val.getImgIds(catIds=[x]) for x in range(1,91)]
+
+            for image in image_index:
+                subj_info = self.stim_descriptions.iloc[image]
+                coco_id = subj_info['cocoId']
+                
+                if subj_info['cocoSplit'] == 'train2017':
+
+                    image_categories = [j for j, x in enumerate(image_by_cats_train) if coco_id in x]
+
+                    category_names = [categories.iloc[c-1]['name'] for c in image_categories]
+                    
+                    coco_cats.append(category_names)
+
+                elif subj_info['cocoSplit'] == 'val2017':
+
+                    image_categories = [j for j, x in enumerate(image_by_cats_val) if coco_id in x]
+
+                    category_names = [categories.iloc[c-1]['name'] for c in image_categories]
+                    
+                    coco_cats.append(category_names)
+
+        return coco_cats
