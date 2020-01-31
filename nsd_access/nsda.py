@@ -471,13 +471,16 @@ class NSDAccess(object):
                 self.download_coco_annotation_file()
 
             coco = COCO(annot_file)
-            categories = json_normalize(coco.loadCats(coco.getCatIds()))
+
+            cat_ids = coco.getCatIds()
+            categories = json_normalize(coco.loadCats(cat_ids))
             
-            image_by_cats = [coco.getImgIds(catIds=[x]) for x in range(1,91)]
-
-            image_categories = [j for j, x in enumerate(image_by_cats) if coco_id in x]
-
-            coco_cats = [categories.iloc[c-1]['name'] for c in image_categories] 
+            coco_cats = []
+            for cat_id in cat_ids:
+                this_img_list = coco.getImgIds(catIds=[cat_id])
+                if coco_id in this_img_list:
+                    this_cat = np.asarray(categories[categories['id']==cat_id]['name'])[0]
+                    coco_cats.append(this_cat)
 
         elif len(image_index) > 1:
 
@@ -488,36 +491,32 @@ class NSDAccess(object):
             annot_file = self.coco_annotation_file.format(
                 'instances', 'train2017')
             coco_train = COCO(annot_file)
-            categories_train = json_normalize(coco_train.loadCats(coco_train.getCatIds()))
-
-            image_by_cats_train = [coco_train.getImgIds(catIds=[x]) for x in range(1,91)]
+            cat_ids_train = coco_train.getCatIds()
+            categories_train = json_normalize(coco_train.loadCats(cat_ids_train))
 
             # also load the val 2017
             annot_file = self.coco_annotation_file.format(
                 'instances', 'val2017')
             coco_val = COCO(annot_file)
-            categories_val = json_normalize(coco_val.loadCats(coco_val.getCatIds()))
-
-            image_by_cats_val = [coco_val.getImgIds(catIds=[x]) for x in range(1,91)]
+            cat_ids_val = coco_val.getCatIds()
+            categories_val = json_normalize(coco_val.loadCats(cat_ids_val))
 
             for image in image_index:
                 subj_info = self.stim_descriptions.iloc[image]
                 coco_id = subj_info['cocoId']
-                
+                image_cat = []
                 if subj_info['cocoSplit'] == 'train2017':
-
-                    image_categories = [j for j, x in enumerate(image_by_cats_train) if coco_id in x]
-
-                    category_names = [categories_train.iloc[c-1]['name'] for c in image_categories]
-                    
-                    coco_cats.append(category_names)
-
+                    for cat_id in cat_ids_train:
+                        this_img_list = coco_train.getImgIds(catIds=[cat_id])
+                        if coco_id in this_img_list:
+                            this_cat = np.asarray(categories_train[categories_train['id']==cat_id]['name'])[0]
+                            image_cat.append(this_cat)
+                
                 elif subj_info['cocoSplit'] == 'val2017':
-
-                    image_categories = [j for j, x in enumerate(image_by_cats_val) if coco_id in x]
-
-                    category_names = [categories_val.iloc[c-1]['name'] for c in image_categories]
-                    
-                    coco_cats.append(category_names)
-
+                    for cat_id in cat_ids_val:
+                        this_img_list = coco_val.getImgIds(catIds=[cat_id])
+                        if coco_id in this_img_list:
+                            this_cat = np.asarray(categories_val[categories_val['id']==cat_id]['name'])[0]
+                            image_cat.append(this_cat)
+                coco_cats.append(image_cat)
         return coco_cats
