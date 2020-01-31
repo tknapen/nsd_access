@@ -488,6 +488,7 @@ class NSDAccess(object):
             annot_file = self.coco_annotation_file.format(
                 'instances', 'train2017')
             coco_train = COCO(annot_file)
+            categories_train = json_normalize(coco_train.loadCats(coco_train.getCatIds()))
 
             image_by_cats_train = [coco_train.getImgIds(catIds=[x]) for x in range(1,91)]
 
@@ -495,6 +496,7 @@ class NSDAccess(object):
             annot_file = self.coco_annotation_file.format(
                 'instances', 'val2017')
             coco_val = COCO(annot_file)
+            categories_val = json_normalize(coco_val.loadCats(coco_val.getCatIds()))
 
             image_by_cats_val = [coco_val.getImgIds(catIds=[x]) for x in range(1,91)]
 
@@ -506,7 +508,7 @@ class NSDAccess(object):
 
                     image_categories = [j for j, x in enumerate(image_by_cats_train) if coco_id in x]
 
-                    category_names = [categories.iloc[c-1]['name'] for c in image_categories]
+                    category_names = [categories_train.iloc[c-1]['name'] for c in image_categories]
                     
                     coco_cats.append(category_names)
 
@@ -514,7 +516,7 @@ class NSDAccess(object):
 
                     image_categories = [j for j, x in enumerate(image_by_cats_val) if coco_id in x]
 
-                    category_names = [categories.iloc[c-1]['name'] for c in image_categories]
+                    category_names = [categories_val.iloc[c-1]['name'] for c in image_categories]
                     
                     coco_cats.append(category_names)
 
