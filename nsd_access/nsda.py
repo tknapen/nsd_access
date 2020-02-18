@@ -144,7 +144,7 @@ class NSDAccess(object):
             session_betas = []
             for hemi in ['lh', 'rh']:
                 hdata = nb.load(op.join(
-                    data_folder, f'{hemi}.betas_session{si_str}.mgz')).get_data()
+                    data_folder, f'{hemi}.betas_session{si_str}.mgh')).get_data()
                 session_betas.append(hdata)
             out_data = np.squeeze(np.vstack(session_betas))
         else:
@@ -373,8 +373,7 @@ class NSDAccess(object):
             self.stim_descriptions = pd.read_csv(
                 self.stimuli_description_file, index_col=0)
         if len(image_index) == 1:
-            subj_info = self.stim_descriptions.iloc[image_index]
-
+            subj_info = self.stim_descriptions.iloc[image_index[0]]
             # checking whether annotation file for this trial exists.
             # This may not be the right place to call the download, and
             # re-opening the annotations for all images separately may be slowing things down
@@ -391,7 +390,7 @@ class NSDAccess(object):
             coco_annot = coco.loadAnns(coco_annot_IDs)
 
             if show_img:
-                self.read_images([image_index], show=True)
+                self.read_images(image_index, show=True)
 
             if show_annot:
                 # still need to convert the annotations (especially person_keypoints and instances) to the right reference frame,
