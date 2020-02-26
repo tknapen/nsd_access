@@ -5,7 +5,8 @@ import nibabel as nb
 import numpy as np
 import pandas as pd
 from pandas.io.json import json_normalize
-
+from joblib import Parallel, delayed
+from tqdm import tqdm
 import h5py
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -15,6 +16,34 @@ import zipfile
 from pycocotools.coco import COCO
 
 from IPython import embed
+
+
+def coco_category(
+        stim_descriptions,
+        image,
+        cat_ids_train,
+        cat_ids_val,
+        coco_train,
+        coco_val,
+        categories_train,
+        categories_val):
+    subj_info = stim_descriptions.iloc[image]
+    coco_id = subj_info['cocoId']
+    image_cat = []
+    if subj_info['cocoSplit'] == 'train2017':
+        for cat_id in cat_ids_train:
+            this_img_list = coco_train.getImgIds(catIds=[cat_id])
+            if coco_id in this_img_list:
+                this_cat = np.asarray(categories_train[categories_train['id']==cat_id]['name'])[0]
+                image_cat.append(this_cat)
+
+    elif subj_info['cocoSplit'] == 'val2017':
+        for cat_id in cat_ids_val:
+            this_img_list = coco_val.getImgIds(catIds=[cat_id])
+            if coco_id in this_img_list:
+                this_cat = np.asarray(categories_val[categories_val['id']==cat_id]['name'])[0]
+                image_cat.append(this_cat)
+    return image_cat
 
 
 class NSDAccess(object):
@@ -429,7 +458,7 @@ class NSDAccess(object):
 
         return coco_annot
 
-    def read_image_coco_category(self, image_index):
+    def read_image_coco_category(self, image_index, njobs=1):
         """image_coco_category returns the coco category of a single image or a list of images
         
         Args:
@@ -501,22 +530,31 @@ class NSDAccess(object):
             cat_ids_val = coco_val.getCatIds()
             categories_val = json_normalize(coco_val.loadCats(cat_ids_val))
 
-            for image in image_index:
-                subj_info = self.stim_descriptions.iloc[image]
-                coco_id = subj_info['cocoId']
-                image_cat = []
-                if subj_info['cocoSplit'] == 'train2017':
-                    for cat_id in cat_ids_train:
-                        this_img_list = coco_train.getImgIds(catIds=[cat_id])
-                        if coco_id in this_img_list:
-                            this_cat = np.asarray(categories_train[categories_train['id']==cat_id]['name'])[0]
-                            image_cat.append(this_cat)
-                
-                elif subj_info['cocoSplit'] == 'val2017':
-                    for cat_id in cat_ids_val:
-                        this_img_list = coco_val.getImgIds(catIds=[cat_id])
-                        if coco_id in this_img_list:
-                            this_cat = np.asarray(categories_val[categories_val['id']==cat_id]['name'])[0]
-                            image_cat.append(this_cat)
-                coco_cats.append(image_cat)
+            if njobs == 1:
+                for image in image_index:
+                    subj_info = self.stim_descriptions.iloc[image]
+                    coco_id = subj_info['cocoId']
+                    image_cat = []
+                    if subj_info['cocoSplit'] == 'train2017':
+                        for cat_id in cat_ids_train:
+                            this_img_list = coco_train.getImgIds(catIds=[cat_id])
+                            if coco_id in this_img_list:
+                                this_cat = np.asarray(categories_train[categories_train['id']==cat_id]['name'])[0]
+                                image_cat.append(this_cat)
+                    
+                    elif subj_info['cocoSplit'] == 'val2017':
+                        for cat_id in cat_ids_val:
+                            this_img_list = coco_val.getImgIds(catIds=[cat_id])
+                            if coco_id in this_img_list:
+                                this_cat = np.asarray(categories_val[categories_val['id']==cat_id]['name'])[0]
+                                image_cat.append(this_cat)
+                    coco_cats.append(image_cat)
+
+            else:
+                coco_cats = Parallel(n_jobs=njobs)(
+                    delayed(coco_category)(
+                        self.stim_descriptions, x, cat_ids_train,
+                              cat_ids_val, coco_train, coco_val, categories_train, categories_val) for x in tqdm(image_index))
+
+
         return coco_cats
