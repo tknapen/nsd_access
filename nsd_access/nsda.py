@@ -531,7 +531,7 @@ class NSDAccess(object):
             categories_val = json_normalize(coco_val.loadCats(cat_ids_val))
 
             if njobs == 1:
-                for image in image_index:
+                for image in tqdm(image_index, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
                     subj_info = self.stim_descriptions.iloc[image]
                     coco_id = subj_info['cocoId']
                     image_cat = []
