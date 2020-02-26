@@ -554,7 +554,8 @@ class NSDAccess(object):
                 coco_cats = Parallel(n_jobs=njobs)(
                     delayed(coco_category)(
                         self.stim_descriptions, x, cat_ids_train,
-                              cat_ids_val, coco_train, coco_val, categories_train, categories_val) for x in tqdm(image_index))
+                              cat_ids_val, coco_train, coco_val, categories_train, categories_val) for x in tqdm(
+                                  image_index, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'))
 
 
         return coco_cats
