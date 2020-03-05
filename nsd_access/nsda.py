@@ -4,9 +4,9 @@ import glob
 import nibabel as nb
 import numpy as np
 import pandas as pd
-
+from pandas.io.json import json_normalize
+from tqdm import tqdm
 import h5py
-
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
@@ -374,6 +374,7 @@ class NSDAccess(object):
                 self.stimuli_description_file, index_col=0)
         if len(image_index) == 1:
             subj_info = self.stim_descriptions.iloc[image_index[0]]
+
             # checking whether annotation file for this trial exists.
             # This may not be the right place to call the download, and
             # re-opening the annotations for all images separately may be slowing things down
@@ -427,3 +428,95 @@ class NSDAccess(object):
                     coco_annot.append(coco_ann)
 
         return coco_annot
+
+    def read_image_coco_category(self, image_index):
+        """image_coco_category returns the coco category of a single image or a list of images
+        
+        Args:
+            image_index ([list of integers]):  which images indexed in the 73k format to return
+                                               the category for
+
+        Returns
+        -------
+        coco category
+        coco category, to be used in subsequent analysis steps
+
+            Example
+            -------
+            single image:
+                    ci = read_image_coco_category(
+                        [569])
+            list of images:
+                    ci = read_image_coco_category(
+                        [569, 2569])
+        """
+
+        if not hasattr(self, 'stim_descriptions'):
+            self.stim_descriptions = pd.read_csv(
+                self.stimuli_description_file, index_col=0)
+
+        if len(image_index) == 1:
+            subj_info = self.stim_descriptions.iloc[image_index[0]]
+            coco_id = subj_info['cocoId']
+
+            # checking whether annotation file for this trial exists.
+            # This may not be the right place to call the download, and
+            # re-opening the annotations for all images separately may be slowing things down
+            # however images used in the experiment seem to have come from different sets.
+            annot_file = self.coco_annotation_file.format(
+                'instances', subj_info['cocoSplit'])
+            print('getting annotations from ' + annot_file)
+            if not os.path.isfile(annot_file):
+                print('annotations file not found')
+                self.download_coco_annotation_file()
+
+            coco = COCO(annot_file)
+
+            cat_ids = coco.getCatIds()
+            categories = json_normalize(coco.loadCats(cat_ids))
+            
+            coco_cats = []
+            for cat_id in cat_ids:
+                this_img_list = coco.getImgIds(catIds=[cat_id])
+                if coco_id in this_img_list:
+                    this_cat = np.asarray(categories[categories['id']==cat_id]['name'])[0]
+                    coco_cats.append(this_cat)
+
+        elif len(image_index) > 1:
+
+            # we output a list of annots
+            coco_cats = []
+
+            # load train_2017
+            annot_file = self.coco_annotation_file.format(
+                'instances', 'train2017')
+            coco_train = COCO(annot_file)
+            cat_ids_train = coco_train.getCatIds()
+            categories_train = json_normalize(coco_train.loadCats(cat_ids_train))
+
+            # also load the val 2017
+            annot_file = self.coco_annotation_file.format(
+                'instances', 'val2017')
+            coco_val = COCO(annot_file)
+            cat_ids_val = coco_val.getCatIds()
+            categories_val = json_normalize(coco_val.loadCats(cat_ids_val))
+
+            for image in tqdm(image_index, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
+                subj_info = self.stim_descriptions.iloc[image]
+                coco_id = subj_info['cocoId']
+                image_cat = []
+                if subj_info['cocoSplit'] == 'train2017':
+                    for cat_id in cat_ids_train:
+                        this_img_list = coco_train.getImgIds(catIds=[cat_id])
+                        if coco_id in this_img_list:
+                            this_cat = np.asarray(categories_train[categories_train['id']==cat_id]['name'])[0]
+                            image_cat.append(this_cat)
+                
+                elif subj_info['cocoSplit'] == 'val2017':
+                    for cat_id in cat_ids_val:
+                        this_img_list = coco_val.getImgIds(catIds=[cat_id])
+                        if coco_id in this_img_list:
+                            this_cat = np.asarray(categories_val[categories_val['id']==cat_id]['name'])[0]
+                            image_cat.append(this_cat)
+                coco_cats.append(image_cat)
+        return coco_cats
