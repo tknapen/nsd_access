@@ -144,7 +144,7 @@ class NSDAccess(object):
             session_betas = []
             for hemi in ['lh', 'rh']:
                 hdata = nb.load(op.join(
-                    data_folder, f'{hemi}.betas_session{si_str}.mgz')).get_data()
+                    data_folder, f'{hemi}.betas_session{si_str}.mgh')).get_data()
                 session_betas.append(hdata)
             out_data = np.squeeze(np.vstack(session_betas))
         else:
@@ -391,7 +391,7 @@ class NSDAccess(object):
             coco_annot = coco.loadAnns(coco_annot_IDs)
 
             if show_img:
-                self.read_images([image_index], show=True)
+                self.read_images(image_index, show=True)
 
             if show_annot:
                 # still need to convert the annotations (especially person_keypoints and instances) to the right reference frame,
