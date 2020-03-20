@@ -40,5 +40,5 @@ class NSDStimulus(object):
                                                                 cat_id])
             if self.coco_image_id in this_img_list:
                 this_cat = np.asarray(
-                    categories[categories['id'] == cat_id]['name'])[0]
+                    self.categories[self.categories['id'] == cat_id]['name'])[0]
                 self.coco_categories.append(this_cat)
