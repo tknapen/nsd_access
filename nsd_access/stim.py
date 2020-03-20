@@ -19,9 +19,7 @@ class NSDStimulus(object):
         and internalizes them
         """
         for info_type in ['captions', 'person_keypoints', 'instances']:
-            annot_file = self.nsda.coco_annotation_file.format(
-                info_type, self.coco_split)
-            coco = COCO(annot_file)
+            coco = self.nsda.coco_annotations[self.coco_split+'_'+info_type]
             coco_annot_IDs = coco.getAnnIds([self.coco_image_ID])
             setattr(self, 'coco_annot_'+info_type,
                     coco.loadAnns(coco_annot_IDs))
