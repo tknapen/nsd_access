@@ -22,7 +22,17 @@ class NSDAccess(object):
     Little class that provides easy access to the NSD data, see [http://naturalscenesdataset.org](their website)
     """
 
-    def __init__(self, nsd_folder, *args, **kwargs):
+    def __init__(self, nsd_folder, read_annotations=True, *args, **kwargs):
+        """__init__ constructor
+
+        Parameters
+        ----------
+        nsd_folder : str, path
+            location of the NSD data on disk
+        read_annotations : bool, optional
+            whether to read in coco annotations, by default True
+            For reading only brain data this is not necessary, so can be False
+        """
         super().__init__(*args, **kwargs)
         self.nsd_folder = nsd_folder
         self.nsddata_folder = op.join(self.nsd_folder, 'nsddata')
@@ -37,10 +47,15 @@ class NSDAccess(object):
         self.stimuli_description_file = op.join(
             self.nsd_folder, 'nsddata', 'experiments', 'nsd', 'nsd_stim_info_merged.csv')
 
-        self.coco_annotation_file = op.join(
-            self.nsd_folder, 'nsddata_stimuli', 'stimuli', 'nsd', 'annotations', '{}_{}.json')
+        if read_annotations:
+            # the following takes a long time, but is necessary to have all annotation information handy.
+            self.coco_annotation_file = op.join(
+                self.nsd_folder, 'nsddata_stimuli', 'stimuli', 'nsd', 'annotations', '{}_{}.json')
 
-        self.load_coco_annotations()
+            self.load_coco_annotations()
+
+            self.stim_descriptions = pd.read_csv(
+                self.stimuli_description_file, index_col=0)
 
     def download_coco_annotation_file(self, url='http://images.cocodataset.org/annotations/annotations_trainval2017.zip'):
         """download_coco_annotation_file downloads and extracts the relevant annotations files
@@ -57,9 +72,9 @@ class NSDAccess(object):
             op.split(self.coco_annotation_file)[0])[0])
 
     def load_coco_annotations(self,
-                            info_types=['captions',
-                                'person_keypoints', 'instances'],
-                            coco_splits=['train2017', 'val2017']):
+                              info_types=['captions',
+                                          'person_keypoints', 'instances'],
+                              coco_splits=['train2017', 'val2017']):
         """load_coco_annotations creates a coco_annotations instance variable
         containing the COCO annotation information, for faster access.
 
@@ -78,7 +93,8 @@ class NSDAccess(object):
                 if not os.path.isfile(annot_file):
                     print('annotations file not found')
                     self.download_coco_annotation_file()
-                self.coco_annotations.update({coco_split + '_' + info_type: COCO(annot_file})
+                self.coco_annotations.update(
+                    {coco_split + '_' + info_type: COCO(annot_file)})
 
     def affine_header(self, subject, data_format='func1pt8mm'):
         """affine_header affine and header, for construction of Nifti image
@@ -95,11 +111,11 @@ class NSDAccess(object):
         tuple
             affine and header, for construction of Nifti image
         """
-        full_path=op.join(self.ppdata_folder,
+        full_path = op.join(self.ppdata_folder,
                             '{subject}', '{data_format}', 'brainmask.nii.gz')
-        full_path=full_path.format(subject=subject,
+        full_path = full_path.format(subject=subject,
                                      data_format=data_format)
-        nii=nb.load(full_path)
+        nii = nb.load(full_path)
 
         return nii.affine, nii.header
 
@@ -118,9 +134,9 @@ class NSDAccess(object):
         numpy.ndarray, 4D (bool)
             brain mask array
         """
-        full_path=op.join(self.ppdata_folder,
+        full_path = op.join(self.ppdata_folder,
                             '{subject}', '{data_format}', '{filename}.nii.gz')
-        full_path=full_path.format(subject=subject,
+        full_path = full_path.format(subject=subject,
                                      data_format=data_format,
                                      filename=filename)
         return nb.load(full_path).get_data()
@@ -148,38 +164,38 @@ class NSDAccess(object):
         numpy.ndarray, 2D (fsaverage) or 4D (other data formats)
             the requested per-trial beta values
         """
-        data_folder=op.join(self.nsddata_betas_folder,
+        data_folder = op.join(self.nsddata_betas_folder,
                               subject, data_format, data_type)
-        si_str=str(session_index).zfill(2)
+        si_str = str(session_index).zfill(2)
 
         if type(mask) == np.ndarray:  # will use the mat file iff exists, otherwise boom!
-            ipf=op.join(data_folder, f'betas_session{si_str}.mat')
+            ipf = op.join(data_folder, f'betas_session{si_str}.mat')
             assert op.isfile(ipf), \
                 'Error: ' + ipf + ' not available for masking. You may need to download these separately.'
             # will do indexing of both space and time in one go for this option,
             # so will return results immediately from this
-            h5=h5py.File(ipf, 'r')
-            betas=h5.get('betas')
+            h5 = h5py.File(ipf, 'r')
+            betas = h5.get('betas')
             # embed()
             if len(trial_index) == 0:
-                trial_index=slice(0, betas.shape[0])
+                trial_index = slice(0, betas.shape[0])
             # this isn't finished yet - binary masks cannot be used for indexing like this
             return betas[trial_index, np.nonzero(mask)]
 
         if data_format == 'fsaverage':
-            session_betas=[]
+            session_betas = []
             for hemi in ['lh', 'rh']:
-                hdata=nb.load(op.join(
+                hdata = nb.load(op.join(
                     data_folder, f'{hemi}.betas_session{si_str}.mgh')).get_data()
                 session_betas.append(hdata)
-            out_data=np.squeeze(np.vstack(session_betas))
+            out_data = np.squeeze(np.vstack(session_betas))
         else:
             # if no mask was specified, we'll use the nifti image
-            out_data=nb.load(
+            out_data = nb.load(
                 op.join(data_folder, f'betas_session{si_str}.nii.gz')).get_data()
 
         if len(trial_index) == 0:
-            trial_index=slice(0, out_data.shape[-1])
+            trial_index = slice(0, out_data.shape[-1])
 
         return out_data[..., trial_index]
 
@@ -239,32 +255,32 @@ class NSDAccess(object):
         """
 
         # first, get the mapping.
-        atlas_name=atlas
+        atlas_name = atlas
         if atlas[:3] in ('rh.', 'lh.'):
-            atlas_name=atlas[3:]
+            atlas_name = atlas[3:]
 
-        mapp_df=pd.read_csv(os.path.join(self.nsddata_folder, 'freesurfer', 'fsaverage',
+        mapp_df = pd.read_csv(os.path.join(self.nsddata_folder, 'freesurfer', 'fsaverage',
                                            'label', f'{atlas_name}.mgz.ctab'), delimiter=' ', header=None, index_col=0)
-        atlas_mapping=mapp_df.to_dict()[1]
+        atlas_mapping = mapp_df.to_dict()[1]
         # dict((y,x) for x,y in atlas_mapping.iteritems())
-        atlas_mapping={y: x for x, y in atlas_mapping.items()}
+        atlas_mapping = {y: x for x, y in atlas_mapping.items()}
 
         if data_format not in ('func1pt8mm', 'func1mm', 'MNI'):
             # if surface based results by exclusion
             if atlas[:3] in ('rh.', 'lh.'):  # check if hemisphere-specific atlas requested
-                ipf=op.join(self.nsddata_folder, 'freesurfer',
+                ipf = op.join(self.nsddata_folder, 'freesurfer',
                               subject, 'label', f'{atlas}.mgz')
                 return np.squeeze(nb.load(ipf).get_data()), atlas_mapping
             else:  # more than one hemisphere requested
-                session_betas=[]
+                session_betas = []
                 for hemi in ['lh', 'rh']:
-                    hdata=nb.load(op.join(
+                    hdata = nb.load(op.join(
                         self.nsddata_folder, 'freesurfer', subject, 'label', f'{hemi}.{atlas}.mgz')).get_data()
                     session_betas.append(hdata)
-                out_data=np.squeeze(np.vstack(session_betas))
+                out_data = np.squeeze(np.vstack(session_betas))
                 return out_data, atlas_mapping
         else:  # is 'func1pt8mm', 'MNI', or 'func1mm'
-            ipf=op.join(self.ppdata_folder, subject,
+            ipf = op.join(self.ppdata_folder, subject,
                           data_format, 'roi', f'{atlas}.nii.gz')
             return nb.load(ipf).get_data(), atlas_mapping
 
@@ -287,15 +303,15 @@ class NSDAccess(object):
             collection of absolute path names to
         """
         if data_format in ('func1pt8mm', 'func1mm', 'MNI'):
-            atlas_files=glob.glob(
+            atlas_files = glob.glob(
                 op.join(self.ppdata_folder, subject, data_format, 'roi', '*.nii.gz'))
         else:
-            atlas_files=glob.glob(
+            atlas_files = glob.glob(
                 op.join(self.nsddata_folder, 'freesurfer', subject, 'label', '*.mgz'))
 
         # print this
         import pprint
-        pp=pprint.PrettyPrinter(indent=4)
+        pp = pprint.PrettyPrinter(indent=4)
         print('Atlases found in {}:'.format(op.split(atlas_files[0])[0]))
         pp.pprint([op.split(f)[1] for f in atlas_files])
         if abs_paths:
@@ -321,16 +337,16 @@ class NSDAccess(object):
             DataFrame containing the behavioral information for the requested trials
         """
 
-        behavior=pd.read_csv(self.behavior_file.format(
+        behavior = pd.read_csv(self.behavior_file.format(
             subject=subject), delimiter='\t')
 
         # the behavior is encoded per run.
         # I'm now setting this function up so that it aligns with the timepoints in the fmri files,
         # i.e. using indexing per session, and not using the 'run' information.
-        session_behavior=behavior[behavior['SESSION'] == session_index]
+        session_behavior = behavior[behavior['SESSION'] == session_index]
 
         if len(trial_index) == 0:
-            trial_index=slice(0, len(session_behavior))
+            trial_index = slice(0, len(session_behavior))
 
         return session_behavior.iloc[trial_index]
 
@@ -351,16 +367,16 @@ class NSDAccess(object):
         """
 
         if not hasattr(self, 'stim_descriptions'):
-            self.stim_descriptions=pd.read_csv(
+            self.stim_descriptions = pd.read_csv(
                 self.stimuli_description_file, index_col=0)
 
-        sf=h5py.File(self.stimuli_file, 'r')
-        sdataset=sf.get('imgBrick')
+        sf = h5py.File(self.stimuli_file, 'r')
+        sdataset = sf.get('imgBrick')
         if show:
-            f, ss=plt.subplots(1, len(image_index),
+            f, ss = plt.subplots(1, len(image_index),
                                  figsize=(6*len(image_index), 6))
             if len(image_index) == 1:
-                ss=[ss]
+                ss = [ss]
             for s, d in zip(ss, sdataset[image_index]):
                 s.axis('off')
                 s.imshow(d)
@@ -396,25 +412,25 @@ class NSDAccess(object):
 
         """
         if not hasattr(self, 'stim_descriptions'):
-            self.stim_descriptions=pd.read_csv(
+            self.stim_descriptions = pd.read_csv(
                 self.stimuli_description_file, index_col=0)
         if len(image_index) == 1:
-            subj_info=self.stim_descriptions.iloc[image_index[0]]
+            subj_info = self.stim_descriptions.iloc[image_index[0]]
 
             # checking whether annotation file for this trial exists.
             # This may not be the right place to call the download, and
             # re-opening the annotations for all images separately may be slowing things down
             # however images used in the experiment seem to have come from different sets.
-            annot_file=self.coco_annotation_file.format(
+            annot_file = self.coco_annotation_file.format(
                 info_type, subj_info['cocoSplit'])
             print('getting annotations from ' + annot_file)
             if not os.path.isfile(annot_file):
                 print('annotations file not found')
                 self.download_coco_annotation_file()
 
-            coco=COCO(annot_file)
-            coco_annot_IDs=coco.getAnnIds([subj_info['cocoId']])
-            coco_annot=coco.loadAnns(coco_annot_IDs)
+            coco = COCO(annot_file)
+            coco_annot_IDs = coco.getAnnIds([subj_info['cocoId']])
+            coco_annot = coco.loadAnns(coco_annot_IDs)
 
             if show_img:
                 self.read_images(image_index, show=True)
@@ -427,30 +443,30 @@ class NSDAccess(object):
         elif len(image_index) > 1:
 
             # we output a list of annots
-            coco_annot=[]
+            coco_annot = []
 
             # load train_2017
-            annot_file=self.coco_annotation_file.format(
+            annot_file = self.coco_annotation_file.format(
                 info_type, 'train2017')
-            coco_train=COCO(annot_file)
+            coco_train = COCO(annot_file)
 
             # also load the val 2017
-            annot_file=self.coco_annotation_file.format(
+            annot_file = self.coco_annotation_file.format(
                 info_type, 'val2017')
-            coco_val=COCO(annot_file)
+            coco_val = COCO(annot_file)
 
             for image in image_index:
-                subj_info=self.stim_descriptions.iloc[image]
+                subj_info = self.stim_descriptions.iloc[image]
                 if subj_info['cocoSplit'] == 'train2017':
-                    coco_annot_IDs=coco_train.getAnnIds(
+                    coco_annot_IDs = coco_train.getAnnIds(
                         [subj_info['cocoId']])
-                    coco_ann=coco_train.loadAnns(coco_annot_IDs)
+                    coco_ann = coco_train.loadAnns(coco_annot_IDs)
                     coco_annot.append(coco_ann)
 
                 elif subj_info['cocoSplit'] == 'val2017':
-                    coco_annot_IDs=coco_val.getAnnIds(
+                    coco_annot_IDs = coco_val.getAnnIds(
                         [subj_info['cocoId']])
-                    coco_ann=coco_val.loadAnns(coco_annot_IDs)
+                    coco_ann = coco_val.loadAnns(coco_annot_IDs)
                     coco_annot.append(coco_ann)
 
         return coco_annot
@@ -478,73 +494,74 @@ class NSDAccess(object):
         """
 
         if not hasattr(self, 'stim_descriptions'):
-            self.stim_descriptions=pd.read_csv(
+            self.stim_descriptions = pd.read_csv(
                 self.stimuli_description_file, index_col=0)
 
         if len(image_index) == 1:
-            subj_info=self.stim_descriptions.iloc[image_index[0]]
-            coco_id=subj_info['cocoId']
+            subj_info = self.stim_descriptions.iloc[image_index[0]]
+            coco_id = subj_info['cocoId']
 
             # checking whether annotation file for this trial exists.
             # This may not be the right place to call the download, and
             # re-opening the annotations for all images separately may be slowing things down
             # however images used in the experiment seem to have come from different sets.
-            annot_file=self.coco_annotation_file.format(
+            annot_file = self.coco_annotation_file.format(
                 'instances', subj_info['cocoSplit'])
             print('getting annotations from ' + annot_file)
             if not os.path.isfile(annot_file):
                 print('annotations file not found')
                 self.download_coco_annotation_file()
 
-            coco=COCO(annot_file)
+            coco = COCO(annot_file)
 
-            cat_ids=coco.getCatIds()
-            categories=json_normalize(coco.loadCats(cat_ids))
+            cat_ids = coco.getCatIds()
+            categories = json_normalize(coco.loadCats(cat_ids))
 
-            coco_cats=[]
+            coco_cats = []
             for cat_id in cat_ids:
-                this_img_list=coco.getImgIds(catIds=[cat_id])
+                this_img_list = coco.getImgIds(catIds=[cat_id])
                 if coco_id in this_img_list:
-                    this_cat=np.asarray(
+                    this_cat = np.asarray(
                         categories[categories['id'] == cat_id]['name'])[0]
                     coco_cats.append(this_cat)
 
         elif len(image_index) > 1:
 
             # we output a list of annots
-            coco_cats=[]
+            coco_cats = []
 
             # load train_2017
-            annot_file=self.coco_annotation_file.format(
+            annot_file = self.coco_annotation_file.format(
                 'instances', 'train2017')
-            coco_train=COCO(annot_file)
-            cat_ids_train=coco_train.getCatIds()
-            categories_train=json_normalize(coco_train.loadCats(cat_ids_train))
+            coco_train = COCO(annot_file)
+            cat_ids_train = coco_train.getCatIds()
+            categories_train = json_normalize(
+                coco_train.loadCats(cat_ids_train))
 
             # also load the val 2017
-            annot_file=self.coco_annotation_file.format(
+            annot_file = self.coco_annotation_file.format(
                 'instances', 'val2017')
-            coco_val=COCO(annot_file)
-            cat_ids_val=coco_val.getCatIds()
-            categories_val=json_normalize(coco_val.loadCats(cat_ids_val))
+            coco_val = COCO(annot_file)
+            cat_ids_val = coco_val.getCatIds()
+            categories_val = json_normalize(coco_val.loadCats(cat_ids_val))
 
             for image in tqdm(image_index, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
-                subj_info=self.stim_descriptions.iloc[image]
-                coco_id=subj_info['cocoId']
-                image_cat=[]
+                subj_info = self.stim_descriptions.iloc[image]
+                coco_id = subj_info['cocoId']
+                image_cat = []
                 if subj_info['cocoSplit'] == 'train2017':
                     for cat_id in cat_ids_train:
-                        this_img_list=coco_train.getImgIds(catIds=[cat_id])
+                        this_img_list = coco_train.getImgIds(catIds=[cat_id])
                         if coco_id in this_img_list:
-                            this_cat=np.asarray(
+                            this_cat = np.asarray(
                                 categories_train[categories_train['id'] == cat_id]['name'])[0]
                             image_cat.append(this_cat)
 
                 elif subj_info['cocoSplit'] == 'val2017':
                     for cat_id in cat_ids_val:
-                        this_img_list=coco_val.getImgIds(catIds=[cat_id])
+                        this_img_list = coco_val.getImgIds(catIds=[cat_id])
                         if coco_id in this_img_list:
-                            this_cat=np.asarray(
+                            this_cat = np.asarray(
                                 categories_val[categories_val['id'] == cat_id]['name'])[0]
                             image_cat.append(this_cat)
                 coco_cats.append(image_cat)
