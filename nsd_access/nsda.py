@@ -4,7 +4,7 @@ import glob
 import nibabel as nb
 import numpy as np
 import pandas as pd
-from pandas.io.json import json_normalize
+from pandas import json_normalize
 from tqdm import tqdm
 import h5py
 import matplotlib.pyplot as plt
