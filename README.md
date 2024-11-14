@@ -16,3 +16,5 @@ For more information on this dataset and the project generating it, see [the NSD
 ### Requirements
 
 Apart from the 'standard' nibabel, numpy, pandas and h5py, [pycocotools](https://github.com/cocodataset/cocoapi) needs to be installed.
+
+[![DOI](https://zenodo.org/badge/209246466.svg)](https://doi.org/10.5281/zenodo.14165748)
